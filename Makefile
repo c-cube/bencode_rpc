@@ -25,6 +25,10 @@ reinstall: all
 uninstall:
 	ocaml setup.ml -uninstall
 
+push_doc: doc
+	scp -r bencode_rpc.docdir/* cedeela.fr:~/simon/root/software/bencode_rpc/
+
 tags:
 	find -name '*.mli?' | xargs otags 
 
+.PHONY: install reinstall uninstall tags push_doc clean

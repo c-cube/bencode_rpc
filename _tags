@@ -1,5 +1,5 @@
 # OASIS_START
-# DO NOT EDIT (digest: c27cd3338b84c43ebc2a61b42d1b0a3c)
+# DO NOT EDIT (digest: 0481511eadaaaa70ac24e57bd8404007)
 # Ignore VCS directories, you can use the same kind of rule outside 
 # OASIS_START/STOP if you want to exclude directories that contains 
 # useless stuff for the build process
@@ -16,7 +16,7 @@
 # Library bencode_rpc
 "src/bencode_rpc.cmxs": use_bencode_rpc
 "src/bencode.cmx": for-pack(Bencode_rpc)
-"src/bencodeRPC.cmx": for-pack(Bencode_rpc)
+"src/RPC.cmx": for-pack(Bencode_rpc)
 "src/net_tcp.cmx": for-pack(Bencode_rpc)
 "src/lwt_queue.cmx": for-pack(Bencode_rpc)
 "src/signal.cmx": for-pack(Bencode_rpc)
