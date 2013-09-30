@@ -146,28 +146,34 @@ let mk_socket () =
 let _remove_client t addr =
   AddrHashtbl.remove t.client_threads addr
 
-let rec _read_bencode ~socket ~decoder ~buf = 
-  Lwt_unix.read socket buf 0 (String.length buf) >>= fun n ->
-  if n = 0
-    then
-      Lwt_unix.close socket >>= fun () ->
-      Lwt.return_none
-    else match B.parse decoder buf 0 n with
-      | B.ParseError msg ->
-        _log "parse error";
+let rec _read_bencode ~socket ~decoder ~buf =
+  match B.parse_resume decoder with
+  | B.ParseOk b -> Lwt.return (Some b)
+  | B.ParseError e ->
+    _log "parse error";
+    Lwt_unix.close socket >>= fun () ->
+    Lwt.return_none
+  | B.ParsePartial ->
+    (* need to read more input *)
+    Lwt_unix.read socket buf 0 (String.length buf) >>= fun n ->
+    if n = 0
+      then
         Lwt_unix.close socket >>= fun () ->
         Lwt.return_none
-      | B.ParsePartial ->
-        _read_bencode ~socket ~decoder ~buf (* read more *)
-      | B.ParseOk msg ->
-        _log "read incoming msg %s" (B.pretty_to_str msg);
-        Lwt.return (Some msg)
-  
+      else match B.parse decoder buf 0 n with
+        | B.ParseError msg ->
+          _log "parse error";
+          Lwt_unix.close socket >>= fun () ->
+          Lwt.return_none
+        | B.ParsePartial ->
+          _read_bencode ~socket ~decoder ~buf (* read more *)
+        | B.ParseOk msg ->
+          _log "read incoming msg %s" (B.pretty_to_str msg);
+          Lwt.return (Some msg)
 
 (* listen for messages from client, reading messages from the socket *)
 let rec _listen_client t ~socket ~decoder ~buf addr =
-  _read_bencode ~socket ~decoder ~buf >>= fun b ->
-  match b with
+  _read_bencode ~socket ~decoder ~buf >>= function
   | None ->
     _remove_client t addr;
     Lwt.return_unit

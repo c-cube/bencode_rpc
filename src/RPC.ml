@@ -98,6 +98,7 @@ let handle_event rpc ev = match ev with
     | B.L ( B.S "call" :: B.I i :: B.S name :: args ) ->
       begin try
         let method_ = Hashtbl.find rpc.methods name in
+        (*Util.debug "method %s called with args %s" name (B.to_string (B.L args));*)
         let fut = method_ args in
         Lwt.on_any fut
           (function 
@@ -120,6 +121,7 @@ let handle_event rpc ev = match ev with
       begin try
         (* find which promise corresponds to this reply *)
         let _, promise = Hashtbl.find rpc.callbacks i in
+        (*Util.debug "got reply for %d: %s" i (B.to_string (B.L args));*)
         Hashtbl.remove rpc.callbacks i;
         Lwt.wakeup promise (Reply args);
       with Not_found -> ()
@@ -153,34 +155,14 @@ let create ?(frequency=2.0) net =
     (fun e -> handle_event rpc e);
   rpc
 
-let notify rpc addr msg =
-  (if rpc.stop then failwith "RPC system stopped");
-  let msg = B.L [ B.S "ntfy"; msg ] in
-  Net.send rpc.net addr msg
-
-let send rpc ?timeout addr msg =
-  (if rpc.stop then failwith "RPC system stopped");
-  (* future for the answer, put it in hashtable *)
-  let future, promise = Lwt.wait () in
-  let n = rpc.count in
-  rpc.count <- n + 1;
-  let ttl = match timeout with
-    | None -> infinity
-    | Some t -> (assert (t> 0.); Unix.gettimeofday () +. t)
-  in
-  Hashtbl.add rpc.callbacks n (ttl, promise);
-  (* send message wrapped in metadata *)
-  let msg' = B.L [ B.S "msg"; B.I n; msg ] in
-  Net.send rpc.net addr msg';
-  future
-
 let register rpc name method_ =
-  (if Hashtbl.mem rpc.methods name
-    then failwith ("remote method " ^ name ^ " already defined"));
+  if Hashtbl.mem rpc.methods name
+    then failwith ("remote method " ^ name ^ " already defined");
+  (*Util.debug "register RPC method %s" name;*)
   Hashtbl.add rpc.methods name method_
 
 let call ?timeout rpc addr name args =
-  (if rpc.stop then failwith "RPC system stopped");
+  if rpc.stop then failwith "RPC system stopped";
   (* future for the answer, put it in hashtable *)
   let future, promise = Lwt.wait () in
   let n = rpc.count in
@@ -191,7 +173,7 @@ let call ?timeout rpc addr name args =
   in
   Hashtbl.add rpc.callbacks n (ttl, promise);
   (* send message wrapped in metadata *)
-  let msg' = B.L ( B.S "call" :: B.I n :: args) in
+  let msg' = B.L ( B.S "call" :: B.I n :: B.S name :: args) in
   Net.send rpc.net addr msg';
   future
 
