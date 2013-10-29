@@ -31,38 +31,78 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 type address = Net_tcp.Address.t
 
-type t
-  (** A RPC system *)
-
-and result =
+type result =
   | NoReply
-  | Reply of Bencode.t list
+  | Reply of Bencode.t
   | Error of string
 
-and method_ = Bencode.t list -> result Lwt.t
-  (** A method can return a result, given a list of arguments *)
+(** {3 RPC remote interface} *)
 
-val create : ?frequency:float -> Net_tcp.t -> t
-  (** Create an instance of the RPC system, which can send and receive
-      remote function calls using the [Net_tcp.t] instance.
-      [frequency] is the frequency, in seconds, at which the
-      RPC system checks whether some replies timed out. *)
+module Proxy : sig
+  type t
 
-val stop : t -> unit
-  (** Disable all threads and active processes *)
+  val connection : t -> Net_tcp.Connection.t
+    (** Underlying connection *)
 
-(** {3 RPC interface} *)
+  val address : t -> address
+    (** Remote address *)
 
-val register : t -> string -> method_ -> unit
-  (** [register rpc name f] registers [f] under the given [name]. Calls
-      to [name] will be handled to [f].
-      @raise Failure when the name is already taken. *)
+  val is_alive : t -> bool
+    (** Is the proxy alive? *)
 
-val call : ?timeout:float -> t ->
-           address -> string -> Bencode.t list -> result Lwt.t
-  (** Call a remote method, with given name and arguments, and get
-      a future reply *)
+  val close : t -> unit
+    (** Close the connection and make the proxy unusable. *)
 
-val call_ignore : t -> address -> string -> Bencode.t list -> unit
-  (** Call a remote method, without expecting result. Errors
-      will not be reported. *)
+  val call : ?timeout:float -> t -> string -> Bencode.t -> result Lwt.t
+    (** Call a remote method, with given name and arguments, and get
+        a future reply
+        @param timeout number of seconds without answer before we
+          decide that no answer will come. After this delay, the result
+          will be {!Error}. By default, 20 seconds. *)
+
+  val call_ignore : t -> string -> Bencode.t -> unit
+    (** Call a remote method, without expecting result. Errors
+        will not be reported. *)
+
+  (** A proxy is parametrized by a [period]. This period, measured in seconds,
+      is the amount of time between two successive checks of query
+      expiration. Every [period] seconds, the system removes method calls
+      that have timeouted, and close them (by sending {!Error}) *)
+
+  val of_conn : ?period:float -> Net_tcp.Connection.t -> t
+    (** Create a proxy from an existing connection
+        @return a proxy that acts as a "remote" object on which methods can be
+          called, or None in case of failure *)
+
+  val connect : ?period:float -> address -> t option Lwt.t
+    (** Connect to a remote node by address. *)
+
+  val by_host : ?period:float -> string -> int -> t option Lwt.t
+
+  val local : ?period:float -> int -> t option Lwt.t
+
+  val by_name : ?period:float -> string -> int -> t option Lwt.t
+    (** DNS lookup before connecting *)
+end
+
+(** {3 RPC server interface} *)
+
+type method_ = Bencode.t -> result Lwt.t
+  (** A method can return a result, given an argument (a {!Bencode.t} value) *)
+
+module Server : sig
+  type t
+    (** A RPC server, exposing a bunch of methods *)
+
+  val create : Net_tcp.Server.t -> t
+    (** Create an instance of the RPC system, which can send and receive
+        remote function calls using the {!Net_tcp.Server.t} instance. *)
+
+  val stop : t -> unit
+    (** Disable all threads and active processes *)
+
+  val register : t -> string -> method_ -> unit
+    (** [register rpc name f] registers [f] under the given [name]. Calls
+        to [name] will be handled to [f].
+        @raise Failure when the name is already taken. *)
+end

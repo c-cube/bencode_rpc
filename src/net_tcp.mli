@@ -74,6 +74,9 @@ module Connection : sig
   val close : t -> unit Lwt.t
     (** Close connection *)
 
+  val is_closed : t -> bool
+    (** Connection closed? *)
+
   val wait : t -> unit Lwt.t
     (** Wait for the connection to close *)
 
@@ -89,11 +92,11 @@ module Connection : sig
   val events : t -> Bencode.t Signal.t
     (** Events: received messages, sent by the remote side *)
 
-  val local : t -> int -> t option Lwt.t
+  val local : int -> t option Lwt.t
 
   val by_host : string -> int -> t option Lwt.t
 
-  val by_name : t -> string -> int -> t option Lwt.t
+  val by_name : string -> int -> t option Lwt.t
     (** use DNS to resolve the given address, then call {!by_host} *)
 
   val of_sock : Lwt_unix.file_descr -> Address.t -> t
@@ -122,7 +125,7 @@ module Server : sig
     (** Signal transmitting events that occur on the server, when the
         server stops or a message is received *)
 
-  val create : ?retry:int -> ?log:bool -> ?port:int ->
+  val create : ?retry:int -> ?port:int ->
               unit -> t option
     (** Create a new network node on the given port, if provided
         (a random port otherwise). May return None if it is impossible
@@ -138,8 +141,4 @@ module Server : sig
 
   val wait : t -> unit Lwt.t
     (** Wait for the server to stop *)
-
-  val enable_log : ?on:out_channel -> t -> unit
-    (** Enable logging of events. Events will be printed on the given
-        file descriptor. *)
 end

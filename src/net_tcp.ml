@@ -216,6 +216,8 @@ module Connection = struct
   let send conn msg =
     Lwt_queue.push conn.queue (Some msg)
 
+  let is_closed conn = not conn.alive
+
   let events conn = conn.events
 
   let wait conn = Lwt_condition.wait conn.on_close
@@ -273,9 +275,6 @@ module Server = struct
       then Lwt.return_unit
       else Lwt_condition.wait t.on_stop
 
-  let enable_log ?(on=Lwt_io.stdout) t =
-    failwith "Net_tcp.enable_log: not implemented"
-
   (* handle given new client *)
   let _handle_client t socket addr =
     (* create connection to client *)
@@ -318,7 +317,7 @@ module Server = struct
     in
     accept ()
 
-  let rec create ?(retry=3) ?(log=false) ?port () =
+  let rec create ?(retry=3) ?port () =
     (* random port if none is specified *)
     let port' = match port with
       | Some p -> p
@@ -338,6 +337,6 @@ module Server = struct
     with Unix.Unix_error _ ->
       (* should we try another port? *)
       if retry > 0 && port = None
-        then create ~retry:(retry-1) ~log ?port ()
+        then create ~retry:(retry-1) ?port ()
         else None
 end
