@@ -33,6 +33,8 @@ module Address = struct
   type t = Unix.inet_addr * int
     (** Adresses are internet addresses, + port *)
 
+  type addr = t
+
   let encode (addr, port) =
     B.L [ B.S (Unix.string_of_inet_addr addr); B.I port ]
 
@@ -61,96 +63,42 @@ module Address = struct
   let of_sockaddr = function
     | Unix.ADDR_INET (a,i) -> a, i
     | _ -> failwith "unexpected Unix address"
+
+  let fmt fmt addr =
+    Format.pp_print_string fmt (to_string addr)
+
+  let to_string = to_string
+
+  let local port =
+    Unix.inet_addr_any, port
+
+  let by_addr addr port =
+    Unix.inet_addr_of_string addr, port
+
+  let by_name host port =
+    Lwt_unix.gethostbyname host >>= fun host ->
+    if Array.length host.Unix.h_addr_list = 0
+      then Lwt.return_none
+      else
+        let addr = host.Unix.h_addr_list.(0), port in
+        Lwt.return (Some addr)
+
+  (** Hashtables on addresses *)
+  module Tbl = Hashtbl.Make(struct
+    type t = addr
+    let equal = eq
+    let hash = hash
+  end)
 end
 
-(** Hashtables on addresses *)
-module AddrHashtbl = Hashtbl.Make(struct
-  type t = Address.t
-  let equal = Address.eq
-  let hash = Address.hash
-end)
-
-let mk_addr addr port =
-  Unix.inet_addr_of_string addr, port
-
-let mk_local_addr port =
-  Unix.inet_addr_any, port
-
-let mk_by_name host port =
-  Lwt_unix.gethostbyname host >>= fun host ->
-  if Array.length host.Unix.h_addr_list = 0
-    then Lwt.return_none
-    else
-      let addr = host.Unix.h_addr_list.(0), port in
-      Lwt.return (Some addr)
-
-type event =
-  | Receive of Address.t * Bencode.t   (* received message *)
-  | Stop  (* stop the DHT *)
-
-type conn_cache = {
-  cc_table : (float * string option Lwt_queue.t) AddrHashtbl.t;
-  cc_size : int;
-} (** Cache of outgoing connections *)
-
-let mk_conn_cache size =
-  {
-    cc_table = AddrHashtbl.create size;
-    cc_size = size;
-  }
-
-type t = {
-  events : event Signal.t;
-  sent : (Address.t * Bencode.t) Signal.t;
-  port : int;
-  mutable listen_thread : unit Lwt.t option;
-  client_threads : unit Lwt.t AddrHashtbl.t;
-  conn_cache : conn_cache;  (* cache of connections *)
-  mutable stop : bool;
-  on_stop : unit Lwt_condition.t;
-} (** Network layer that uses sockets *)
-
-let _log format =
-  let b = Buffer.create 15 in
-  Printf.kbprintf
-    (fun b ->
-      Lwt.ignore_result (Lwt_io.printl (Buffer.contents b)))
-    b format
-
-let enable_log ?(on=stderr) t =
-  Signal.on t.sent
-    (fun (to_, msg) ->
-      Printf.fprintf on "[net]: send %s to %s\n"
-        (B.pretty_to_str msg) (Address.to_string to_);
-      flush on;
-      true);
-  Signal.on t.events
-    (function
-      | Receive (from_, msg) ->
-        Printf.fprintf on "[net]: receive %s from %s\n"
-          (B.pretty_to_str msg) (Address.to_string from_);
-        flush on;
-        true
-      | Stop ->
-        Printf.fprintf on "[net]: stop\n";
-        flush on;
-        false);
-  ()
-
-(* create a socket with the given address
-  TODO: option for ipv6 *)
-let mk_socket () =
-  Lwt_unix.socket Lwt_unix.PF_INET Lwt_unix.SOCK_STREAM 0
-
-(* remove entry of client *)
-let _remove_client t addr =
-  AddrHashtbl.remove t.client_threads addr
+let call_in time f =
+  let fut = Lwt_unix.sleep time in
+  Lwt.on_success fut f
 
 let rec _read_bencode ~socket ~decoder ~buf =
   match B.parse_resume decoder with
   | B.ParseOk b -> Lwt.return (Some b)
   | B.ParseError e ->
-    _log "parse error";
     Lwt_unix.close socket >>= fun () ->
     Lwt.return_none
   | B.ParsePartial ->
@@ -162,177 +110,234 @@ let rec _read_bencode ~socket ~decoder ~buf =
         Lwt.return_none
       else match B.parse decoder buf 0 n with
         | B.ParseError msg ->
-          _log "parse error";
           Lwt_unix.close socket >>= fun () ->
           Lwt.return_none
         | B.ParsePartial ->
           _read_bencode ~socket ~decoder ~buf (* read more *)
         | B.ParseOk msg ->
-          _log "read incoming msg %s" (B.pretty_to_str msg);
           Lwt.return (Some msg)
 
-(* listen for messages from client, reading messages from the socket *)
-let rec _listen_client t ~socket ~decoder ~buf addr =
-  _read_bencode ~socket ~decoder ~buf >>= function
-  | None ->
-    _remove_client t addr;
-    Lwt.return_unit
-  | Some msg ->
-    _log "received %s from client" (B.pretty_to_str msg);
-    Signal.send t.events (Receive (addr, msg));
-    _listen_client t ~socket ~decoder ~buf addr
+(* write the given buffer (n bytes remaining). Calls [k]
+    when done *)
+let rec _write_full ~sock ~buf i n k =
+  if n = 0
+    then k ()
+    else
+      Lwt_unix.write sock buf i n >>= fun j ->
+      _write_full ~sock ~buf (i+j) (n-j) k
 
-(* handle given new client *)
-let _handle_client t socket addr =
-  let addr = Address.of_sockaddr addr in
-  let decoder = B.mk_decoder () in
-  let buf = String.make 256 ' ' in
-  _read_bencode ~socket ~decoder ~buf >>= fun b ->
-  match b with
-  | Some (B.I port) ->
-    let addr = Address.with_port addr port in
-    Lwt_io.printl ("connection from " ^ Address.to_string addr) >>= fun () ->
-    (* handle incoming connection *)
-    let fut = _listen_client t ~socket ~decoder ~buf addr in
-    AddrHashtbl.add t.client_threads addr fut;
-    Lwt.return_unit
-  | _ -> Lwt.return_unit
+let _log format =
+  let b = Buffer.create 15 in
+  Printf.kbprintf
+    (fun b ->
+      Lwt.ignore_result (Lwt_io.printl (Buffer.contents b)))
+    b format
 
-(* main thread that listens to incoming connections *)
-let _listen t port =
-  let addr = mk_local_addr port in
-  let s = mk_socket () in
-  Lwt_unix.bind s (Address.to_sockaddr addr);
-  Lwt_unix.listen s 1024;
-  let rec accept () =
-    Lwt.pick
-      [ (Lwt_unix.accept s >>= fun (s', addr') ->
-        _handle_client t s' addr')
-      ; Lwt_condition.wait t.on_stop  (* stop! *)
-      ]
-    >>= fun () ->
-    if not t.stop
-      then accept ()  (* accept next connection *)
-      else Lwt.return_unit
-  in
-  accept ()
+(* create a socket with the given address
+  TODO: option for ipv6 *)
+let mk_socket () =
+  Lwt_unix.socket Lwt_unix.PF_INET Lwt_unix.SOCK_STREAM 0
 
-(* remove least recently used connection from cache *)
-let _make_room_cache cache =
-  if AddrHashtbl.length cache.cc_table = cache.cc_size then
-    let _, oldest = AddrHashtbl.fold
-      (fun addr (last, q) (old_last, oldest) ->
-        match oldest with
-        | None -> last, Some (addr, q)
-        | _ when last > old_last -> old_last, oldest
-        | _ -> last, Some (addr, q))
-      cache.cc_table (~-. infinity, None)
+(** {2 Connection to a remote machine} *)
+
+module Connection = struct
+  type t = {
+    addr : Address.t;
+    mutable last_ping : float;  (* timestamp of last activity *)
+    mutable alive : bool;
+    on_close : unit Lwt_condition.t;
+    events : B.t Signal.t;
+    decoder : B.decoder;
+    sock : Lwt_unix.file_descr;
+    queue : B.t option Lwt_queue.t; (* messages to send *)
+  }
+
+  let address t = t.addr
+
+  let close conn =
+    if conn.alive then begin
+      conn.alive <- false;
+      Lwt_condition.broadcast conn.on_close ();
+      Lwt_unix.close conn.sock
+    end else Lwt.return_unit
+
+  let finalize t =
+    Gc.finalise (fun t -> Lwt.ignore_result (close t)) t
+
+  (* read messages from the remote end *)
+  let _listen_incoming conn =
+    let buf = String.make 256 ' ' in
+    let rec read () =
+      if not conn.alive then Lwt.return_unit else
+      _read_bencode ~socket:conn.sock ~decoder:conn.decoder ~buf >>=
+      function
+      | None -> close conn
+      | Some b ->
+        Signal.send conn.events b;
+        read ()
     in
-    match oldest with
-    | None -> assert false
-    | Some (addr, q) ->
-      (* close this connection by asking its thread to stop *)
-      _log "make room cache: remove conn to %s" (Address.to_string addr);
-      AddrHashtbl.remove cache.cc_table addr;
-      Lwt_queue.push q None
+    read()
 
-(* writer thread *)
-let _write_thread sock queue =
-  (* get next item to write *)
-  let rec get_item () =
-    _log "_write_thread: wait for message to send";
-    Lwt_queue.pop queue >>=
-    function
-    | None ->
-      Lwt_unix.close sock
-    | Some str ->
-      _log "_write_thread: send %s" str;
-      write_item str 0 (String.length str)
-  (* write the given buffer (n bytes remaining) *)
-  and write_item buf i n =
-    if n = 0
-      then get_item ()
-      else
-        Lwt_unix.write sock buf i n >>= fun j ->
-        write_item buf (i+j) (n-j)
-  in
-  get_item ()
+  (* read messages to send to the remote end *)
+  let rec _listen_queue conn =
+    if not conn.alive then Lwt.return_unit else
+    Lwt_queue.pop conn.queue >>= function
+    | None -> close conn
+    | Some b ->
+      let s = B.to_string b in
+      _write_full ~sock:conn.sock ~buf:s 0 (String.length s)
+        (fun () -> _listen_queue conn)
 
-(* find a connection to address, or create one *)
-let _get_conn t addr =
-  try
-    let _, q = AddrHashtbl.find t.conn_cache.cc_table addr in
-    Lwt.return q
-  with Not_found ->
-    _make_room_cache t.conn_cache;
+  let _create addr sock =
+    let conn = {
+      addr;
+      sock;
+      alive = true;
+      on_close = Lwt_condition.create ();
+      last_ping = Unix.gettimeofday();
+      decoder = B.mk_decoder ();
+      events = Signal.create ();
+      queue = Lwt_queue.create ();
+    } in
+    Lwt.ignore_result (_listen_incoming conn);
+    Lwt.ignore_result (_listen_queue conn);
+    conn
+
+  let try_open addr =
     (* connect to the remote address *)
-    let s = mk_socket () in
-    Lwt_unix.connect s (Address.to_sockaddr addr) >>= fun () ->
-    let q = Lwt_queue.create () in
-    (* start a thread to write from queue to socket *)
-    let worker = _write_thread s q in
-    Lwt_queue.push q (Some (B.to_string (B.I t.port)));
-    (* save the connection *)
-    let now = Unix.gettimeofday () in
-    AddrHashtbl.add t.conn_cache.cc_table addr (now, q);
-    Gc.finalise (fun _ -> Lwt.cancel worker) q;
-    Lwt.return q
-
-(* send message *)
-let send t addr msg =
-  Lwt.ignore_result
-    (Lwt.catch
+    let sock = mk_socket () in
+    Lwt.catch
       (fun () ->
-        (_get_conn t addr >>= fun q ->
-        let str = B.to_string msg in
-        Lwt_queue.push q (Some str);
-        Lwt.return_unit))
-      (function
-        | Unix.Unix_error _ as e ->
-          _log "error: %s" (Printexc.to_string e);
-          Lwt.return_unit
-        | e -> raise e))
+        Lwt_unix.connect sock (Address.to_sockaddr addr) >>= fun () ->
+        let conn = _create addr sock in
+        Lwt.return (Some conn))
+      (fun _ -> Lwt.return_none)
 
-let create ?(size=64) ?(log=false) ?port () =
-  (* random port if none is specified *)
-  let port = match port with
-    | Some p -> p
-    | None -> (Random.int 5000) + 1024
-  in
-  let rec t = {
-    events = Signal.create ();
-    sent = Signal.create ();
-    port;
-    listen_thread = None;
-    client_threads = AddrHashtbl.create 5;
-    conn_cache = mk_conn_cache size;
-    stop = false;
-    on_stop = Lwt_condition.create ();
-  } in
-  try
-    t.listen_thread <- Some (_listen t port);
-    (if log then enable_log t);
-    Some t
-  with Unix.Unix_error _ ->
-    None  (* could not listen *)
+  let send conn msg =
+    Lwt_queue.push conn.queue (Some msg)
 
-let stop t =
-  assert (not t.stop);
-  t.stop <- true;
-  Lwt_condition.broadcast t.on_stop ();
-  ()
+  let events conn = conn.events
 
-let events t = t.events
+  let wait conn = Lwt_condition.wait conn.on_close
 
-let sent t = t.sent
+  let local port = try_open (Address.local port)
 
-let port t = t.port
+  let by_host h port = try_open (Address.by_addr h port)
 
-let call_in time f =
-  let fut = Lwt_unix.sleep time in
-  Lwt.on_success fut f
+  let by_name name port =
+    Address.by_name name port >>= function
+    | None -> Lwt.return_none
+    | Some addr -> try_open addr
 
-let fmt fmt addr =
-  Format.pp_print_string fmt (Address.to_string addr)
+  let of_sock sock addr =
+    _create addr sock
+end
 
-let to_string = Address.to_string
+(** {2 Connections from remote machines} *)
+
+module Server = struct
+  type receive_ev = {
+    rcv_conn : Connection.t;
+    rcv_msg : Bencode.t;
+  } (** Content of a "receive" event *)
+
+  let msg ev = ev.rcv_msg
+
+  let reply ev b = Connection.send ev.rcv_conn b
+
+  type event =
+    | Receive of receive_ev
+    | Stop  (* stop the DHT *)
+
+  type t = {
+    events : event Signal.t;
+    port : int;
+    clients : Connection.t Address.Tbl.t;
+    mutable listen_thread : unit Lwt.t option;
+    mutable stop : bool;
+    on_stop : unit Lwt_condition.t;
+  } (** Network layer that uses sockets *)
+
+  let events t = t.events
+
+  let port t = t.port
+
+  let stop t =
+    if not t.stop then begin
+      t.stop <- true;
+      Lwt_condition.broadcast t.on_stop ()
+    end
+
+  let wait t =
+    if t.stop
+      then Lwt.return_unit
+      else Lwt_condition.wait t.on_stop
+
+  let enable_log ?(on=Lwt_io.stdout) t =
+    failwith "Net_tcp.enable_log: not implemented"
+
+  (* handle given new client *)
+  let _handle_client t socket addr =
+    (* create connection to client *)
+    let conn = Connection.of_sock socket addr in
+    assert (not (Address.Tbl.mem t.clients addr));
+    Address.Tbl.add t.clients addr conn;
+    (* forward received messages *)
+    Signal.on (Connection.events conn)
+      (fun msg ->
+        _log "received %s from client" (B.pretty_to_str msg);
+        Signal.send t.events (Receive {rcv_conn=conn; rcv_msg=msg;});
+        true);
+    (* upon closure of connection, react *)
+    Lwt.on_success (Connection.wait conn)
+      (fun () ->
+        Address.Tbl.remove t.clients (Connection.address conn));
+    Lwt.return_unit
+
+  (* main thread that listens to incoming connections *)
+  let _listen t =
+    let addr = Address.local t.port in
+    let s = mk_socket () in
+    Lwt_unix.bind s (Address.to_sockaddr addr);
+    Lwt_unix.listen s 1024;
+    let rec accept () =
+      Lwt.pick
+        [ (Lwt_unix.accept s >>= fun (s', addr') ->
+          (* re-extract address! *)
+          let addr' = match addr' with
+            | Unix.ADDR_UNIX _ -> assert false
+            | Unix.ADDR_INET (a,i) -> a, i
+          in
+          _handle_client t s' addr')
+        ; Lwt_condition.wait t.on_stop  (* stop! *)
+        ]
+      >>= fun () ->
+      if not t.stop
+        then accept ()  (* accept next connection *)
+        else Lwt.return_unit
+    in
+    accept ()
+
+  let rec create ?(retry=3) ?(log=false) ?port () =
+    (* random port if none is specified *)
+    let port' = match port with
+      | Some p -> p
+      | None -> (Random.int 5000) + 1024
+    in
+    let t = {
+      events = Signal.create ();
+      port=port';
+      listen_thread = None;
+      clients = Address.Tbl.create 15;
+      stop = false;
+      on_stop = Lwt_condition.create ();
+    } in
+    try
+      t.listen_thread <- Some (_listen t);
+      Some t
+    with Unix.Unix_error _ ->
+      (* should we try another port? *)
+      if retry > 0 && port = None
+        then create ~retry:(retry-1) ~log ?port ()
+        else None
+end
