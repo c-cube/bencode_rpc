@@ -241,11 +241,14 @@ module Server = struct
   type receive_ev = {
     rcv_conn : Connection.t;
     rcv_msg : Bencode.t;
+    rcv_addr : Address.t;
   } (** Content of a "receive" event *)
 
   let msg ev = ev.rcv_msg
 
   let reply ev b = Connection.send ev.rcv_conn b
+
+  let addr ev = ev.rcv_addr
 
   type event =
     | Receive of receive_ev
@@ -285,7 +288,8 @@ module Server = struct
     Signal.on (Connection.events conn)
       (fun msg ->
         _log "received %s from client" (B.pretty_to_str msg);
-        Signal.send t.events (Receive {rcv_conn=conn; rcv_msg=msg;});
+        let ev = {rcv_conn=conn; rcv_msg=msg; rcv_addr=addr;} in
+        Signal.send t.events (Receive ev);
         true);
     (* upon closure of connection, react *)
     Lwt.on_success (Connection.wait conn)

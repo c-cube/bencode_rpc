@@ -168,8 +168,7 @@ end
 
 (** {3 RPC Server interface} *)
 
-type method_ = Bencode.t -> result Lwt.t
-  (** A method can return a result, given a list of arguments *)
+type method_ = address -> Bencode.t -> result Lwt.t
 
 module Server = struct
   type reply_tag = {
@@ -182,6 +181,10 @@ module Server = struct
     methods : (string, method_) Hashtbl.t;
   } (** The RPC system *)
 
+  let port rpc = Net.Server.port rpc.net
+
+  let wait rpc = Net.Server.wait rpc.net
+
   let stop rpc = Net.Server.stop rpc.net
 
   (* handle network event *)
@@ -190,12 +193,13 @@ module Server = struct
       (fun ev -> match ev with
       | Net.Server.Stop -> false
       | Net.Server.Receive rcv_ev ->
+        let addr = Net.Server.addr rcv_ev in
         begin match Net.Server.msg rcv_ev with
         | B.L [ B.S "ntfy"; B.S name; arg ]  ->
           (* notification *)
           begin try
             let method_ = Hashtbl.find rpc.methods name in
-            Lwt.ignore_result (method_ arg)
+            Lwt.ignore_result (method_ addr arg)
           with Not_found -> ()
           end
         | B.L [ B.S "call"; B.I i; B.S name; arg ] ->
@@ -203,7 +207,7 @@ module Server = struct
           begin try
             let method_ = Hashtbl.find rpc.methods name in
             (*Util.debug "method %s called with args %s" name (B.to_string (B.L args));*)
-            let fut = method_ arg in
+            let fut = method_ addr arg in
             Lwt.on_any fut
               (function 
                 | NoReply -> ()
@@ -240,3 +244,11 @@ module Server = struct
     (*Util.debug "register RPC method %s" name;*)
     Hashtbl.add rpc.methods name method_
 end
+
+(** {3 Helpers to build methods} *)
+
+let reply b = Lwt.return (Reply b)
+
+let no_reply = Lwt.return NoReply
+
+let error s = Lwt.return (Error s)

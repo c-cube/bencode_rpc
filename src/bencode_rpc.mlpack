@@ -1,8 +1,9 @@
 # OASIS_START
-# DO NOT EDIT (digest: 4f01cfeb503b44b359e79a6054e9d1f5)
+# DO NOT EDIT (digest: 18f7a5ff386d320edf98dd0367169c7a)
 Bencode
 RPC
 Net_tcp
 Lwt_queue
 Signal
+Broadcast
 # OASIS_STOP

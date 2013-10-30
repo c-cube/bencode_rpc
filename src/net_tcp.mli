@@ -40,6 +40,9 @@ module Address : sig
 
   val hash : t -> int
 
+  val with_port : t -> int -> t
+    (** Same address with a different port *)
+
   val local : int -> t
     (** Local adress, with the given port *)
 
@@ -113,6 +116,9 @@ module Server : sig
 
   val msg : receive_ev -> Bencode.t
     (** Message contained in the receive_ev *)
+
+  val addr : receive_ev -> Address.t
+    (** Address of the sender *)
 
   type event =
     | Receive of receive_ev
