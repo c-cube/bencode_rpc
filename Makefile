@@ -1,29 +1,41 @@
+# OASIS_START
+# DO NOT EDIT (digest: bc1e05bfc8b39b664f29dae8dbd3ebbb)
 
-all:
-	ocaml setup.ml -all
+SETUP = ocaml setup.ml
 
-bin:
-	ocaml setup.ml -build
+build: setup.data
+	$(SETUP) -build $(BUILDFLAGS)
 
-tests:
-	ocaml setup.ml -test
+doc: setup.data build
+	$(SETUP) -doc $(DOCFLAGS)
 
-doc:
-	ocaml setup.ml -doc
+test: setup.data build
+	$(SETUP) -test $(TESTFLAGS)
 
-clean:
-	ocaml setup.ml -clean
+all: 
+	$(SETUP) -all $(ALLFLAGS)
 
-# install the main binary
-install: all
-	ocaml setup.ml -install
-	#ocamlfind install $(NAME) META $(INSTALL)
+install: setup.data
+	$(SETUP) -install $(INSTALLFLAGS)
 
-reinstall: all
-	ocaml setup.ml -reinstall
+uninstall: setup.data
+	$(SETUP) -uninstall $(UNINSTALLFLAGS)
 
-uninstall:
-	ocaml setup.ml -uninstall
+reinstall: setup.data
+	$(SETUP) -reinstall $(REINSTALLFLAGS)
+
+clean: 
+	$(SETUP) -clean $(CLEANFLAGS)
+
+distclean: 
+	$(SETUP) -distclean $(DISTCLEANFLAGS)
+
+setup.data:
+	$(SETUP) -configure $(CONFIGUREFLAGS)
+
+.PHONY: build doc test all install uninstall reinstall clean distclean configure
+
+# OASIS_STOP
 
 push_doc: doc
 	scp -r bencode_rpc.docdir/* cedeela.fr:~/simon/root/software/bencode_rpc/
@@ -31,4 +43,4 @@ push_doc: doc
 tags:
 	find -name '*.mli?' | xargs otags 
 
-.PHONY: install reinstall uninstall tags push_doc clean
+.PHONY: push_doc tags
