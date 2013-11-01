@@ -101,13 +101,18 @@ let _handle_incoming rpc =
       true)
 
 (* create a new RPC system *)
-let create net =
+let of_server net =
   let rpc = {
   net;
   methods = Hashtbl.create 15;
   } in
   _handle_incoming rpc;
   rpc
+
+let create ?port ?retry () =
+  match Net.Server.create ?port ?retry () with
+  | None -> None
+  | Some net -> Some (of_server net)
 
 let register rpc name method_ =
   if Hashtbl.mem rpc.methods name

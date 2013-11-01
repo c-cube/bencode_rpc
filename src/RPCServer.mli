@@ -41,13 +41,18 @@ type t
   (** A RPC server, exposing a bunch of methods *)
 
 val port : t -> int
+  (** Port the system listens on *)
 
 val wait : t -> unit Lwt.t
   (** Wait for the server to stop *)
 
-val create : Net_tcp.Server.t -> t
+val of_server : Net_tcp.Server.t -> t
   (** Create an instance of the RPC system, which can send and receive
       remote function calls using the {!Net_tcp.Server.t} instance. *)
+
+val create : ?port:int -> ?retry:int -> unit -> t option
+  (** Calls {!Net_tcp.Server.create} with the given optional arguments,
+      and then build a RPC server on top of it *)
 
 val stop : t -> unit
   (** Disable all threads and active processes *)
