@@ -25,7 +25,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {6 RPC} *)
 
-module Net = Net_tcp
+module Net = NetTcp
 
 type address = Net.Address.t 
 
@@ -161,3 +161,6 @@ let by_name ?period a i =
   Net.Connection.by_name a i >>= function
   | None -> Lwt.return_none
   | Some c -> Lwt.return (Some (of_conn ?period c))
+
+let fmt fmt rpc =
+  Format.fprintf fmt "<RPCClient on %a>" Net.Address.fmt (address rpc)

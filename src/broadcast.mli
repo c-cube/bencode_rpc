@@ -32,6 +32,8 @@ neighbors, and keep a table of recently received messages to
 eliminate duplicates.
 *)
 
+type address = NetTcp.Address.t
+
 type t
   (** Broadcasting algorithm state. A value of this type keeps a list
       of neighbors, a RPC server with some methods, and a cache of recently
@@ -42,7 +44,7 @@ type t
       in only one broadcast. If you need sending twice the same message,
       consider adding some nonce to it (timestamp, random value...) *)
 
-val create : ?cache_timeout:float -> RPC.Server.t -> t
+val create : ?cache_timeout:float -> RPCServer.t -> t
   (** Create a new broadcasting device.
       @param cache_timeout the number of seconds before a received message
         is forgotten. Messages are kept in cache to prevent loops. *)
@@ -50,15 +52,15 @@ val create : ?cache_timeout:float -> RPC.Server.t -> t
 val broadcast : t -> Bencode.t -> unit
   (** Broadcast a message to everyone in the network *)
 
-val connect : t -> RPC.address -> bool Lwt.t
+val connect : t -> address -> bool Lwt.t
   (** Connect to another node. Returns true iff it succeeds. *)
 
-val neighbors : t -> RPC.address list
+val neighbors : t -> address list
   (** Current list of neighbors *)
 
 type event =
   | Receive of Bencode.t
-  | NewNeighbor of RPC.address
+  | NewNeighbor of address
 
 val events : t -> event Signal.t
   (** messages broadcasted by others *)

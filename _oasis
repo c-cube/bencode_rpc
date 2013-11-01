@@ -17,7 +17,7 @@ Description:
 Library "bencode_rpc"
   Path:             src/
   Pack:             true
-  Modules:          Bencode, RPCServer, RPCClient, Net_tcp,
+  Modules:          Bencode, RPCServer, RPCClient, NetTcp,
                     Lwt_queue, Signal, Broadcast
   BuildDepends:     lwt,lwt.unix
 

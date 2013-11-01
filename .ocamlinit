@@ -1,8 +1,10 @@
 #directory "_build/src";;
 #load "bencode_rpc.cma";;
-open Bencode_rpc;;
 #require "lwt";;
 #require "lwt.unix";;
-#install_printer Net_tcp.Address.fmt;;
+open Bencode_rpc;;
+#install_printer NetTcp.Address.fmt;;
 #install_printer Bencode.pretty;;
+#install_printer RPCClient.fmt;;
+#install_printer RPCServer.fmt;;
 module B = Bencode;;

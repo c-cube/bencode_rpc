@@ -26,7 +26,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 RPC server} *)
 
-type address = Net_tcp.Address.t
+type address = NetTcp.Address.t
 
 type result =
   | NoReply
@@ -46,7 +46,7 @@ val port : t -> int
 val wait : t -> unit Lwt.t
   (** Wait for the server to stop *)
 
-val of_server : Net_tcp.Server.t -> t
+val of_server : NetTcp.Server.t -> t
   (** Create an instance of the RPC system, which can send and receive
       remote function calls using the {!Net_tcp.Server.t} instance. *)
 
@@ -61,6 +61,8 @@ val register : t -> string -> method_ -> unit
   (** [register rpc name f] registers [f] under the given [name]. Calls
       to [name] will be handled to [f].
       @raise Failure when the name is already taken. *)
+
+val fmt : Format.formatter -> t -> unit
 
 (** {3 Helpers to build methods} *)
 

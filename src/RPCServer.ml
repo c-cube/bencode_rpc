@@ -27,11 +27,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** {1 RPC server} *)
 
 module B = Bencode
-module Net = Net_tcp
+module Net = NetTcp
 
 let (>>=) = Lwt.(>>=)
 
-type address = Net_tcp.Address.t
+type address = NetTcp.Address.t
 
 type result =
   | NoReply
@@ -119,6 +119,9 @@ let register rpc name method_ =
     then failwith ("remote method " ^ name ^ " already defined");
   (*Util.debug "register RPC method %s" name;*)
   Hashtbl.add rpc.methods name method_
+
+let fmt fmt rpc =
+  Format.fprintf fmt "<RPCServer on %d>" (port rpc)
 
 let reply b = Lwt.return (Reply b)
 

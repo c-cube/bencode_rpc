@@ -29,7 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (** This provides a lightweight RPC mechanism on top of a network
     implementation and B-encoded messages. *)
 
-type address = Net_tcp.Address.t
+type address = NetTcp.Address.t
 
 type result =
   | NoReply
@@ -38,7 +38,7 @@ type result =
 
 type t
 
-val connection : t -> Net_tcp.Connection.t
+val connection : t -> NetTcp.Connection.t
   (** Underlying connection *)
 
 val address : t -> address
@@ -66,7 +66,7 @@ val call_ignore : t -> string -> Bencode.t -> unit
     expiration. Every [period] seconds, the system removes method calls
     that have timeouted, and close them (by sending {!Error}) *)
 
-val of_conn : ?period:float -> Net_tcp.Connection.t -> t
+val of_conn : ?period:float -> NetTcp.Connection.t -> t
   (** Create a proxy from an existing connection
       @return a proxy that acts as a "remote" object on which methods can be
         called, or None in case of failure *)
@@ -80,3 +80,5 @@ val local : ?period:float -> int -> t option Lwt.t
 
 val by_name : ?period:float -> string -> int -> t option Lwt.t
   (** DNS lookup before connecting *)
+
+val fmt : Format.formatter -> t -> unit

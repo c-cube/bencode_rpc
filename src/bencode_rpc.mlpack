@@ -1,9 +1,9 @@
 # OASIS_START
-# DO NOT EDIT (digest: 0b22e9eef8dd5b443913f77a2df107ee)
+# DO NOT EDIT (digest: dbe34962fbd5fe4e96f1fca315e552b9)
 Bencode
 RPCServer
 RPCClient
-Net_tcp
+NetTcp
 Lwt_queue
 Signal
 Broadcast

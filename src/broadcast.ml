@@ -26,10 +26,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (** {1 Simple broadcast} *)
 
-module Net = Net_tcp
+module Net = NetTcp
 module B = Bencode
 
 let (>>=) = Lwt.(>>=)
+
+type address = NetTcp.Address.t
 
 module MsgHashtbl = Hashtbl.Make(struct
   type t = B.t
@@ -39,18 +41,18 @@ end)
 
 type event =
   | Receive of Bencode.t
-  | NewNeighbor of RPC.address
+  | NewNeighbor of address
 
 type t = {
   cache_timeout : float;
-  rpc : RPC.Server.t;
+  rpc : RPCServer.t;
   cache : float MsgHashtbl.t;  (* message -> last time received *)
-  neighbors : RPC.Proxy.t Net.Address.Tbl.t;  (* set of neighbors *)
+  neighbors : RPCClient.t Net.Address.Tbl.t;  (* set of neighbors *)
   events : event Signal.t;
 }
 
 let _add_neighbor t proxy =
-  let addr = RPC.Proxy.address proxy in
+  let addr = RPCClient.address proxy in
   Net.Address.Tbl.replace t.neighbors addr proxy
 
 let _remove_neighbor t addr =
@@ -58,7 +60,7 @@ let _remove_neighbor t addr =
 
 (* attempt to connect to a remote node *)
 let _try_connect t addr =
-  let fut = RPC.Proxy.connect addr in
+  let fut = RPCClient.connect addr in
   Lwt.on_success fut
     (function
       | None -> ()
@@ -80,13 +82,13 @@ let rec _cleanup t () =
 
 let _broadcast t msg =
   Net.Address.Tbl.iter
-    (fun _ proxy -> RPC.Proxy.call_ignore proxy "broadcast" msg)
+    (fun _ proxy -> RPCClient.call_ignore proxy "broadcast" msg)
     t.neighbors;
   ()
 
 let _dispatch t =
   (* broadcast message *)
-  RPC.Server.register t.rpc "broadcast"
+  RPCServer.register t.rpc "broadcast"
     (fun _ msg ->
       if not (MsgHashtbl.mem t.cache msg) then begin
         MsgHashtbl.add t.cache msg (Unix.gettimeofday());
@@ -95,21 +97,21 @@ let _dispatch t =
         (* re-broadcast *)
         _broadcast t msg
       end;
-      RPC.no_reply);
+      RPCServer.no_reply);
   (* new connection *)
-  RPC.Server.register t.rpc "hello"
+  RPCServer.register t.rpc "hello"
     (fun addr msg ->
       match msg with
       | B.I port ->
         (* protocol: send the port on which remote node listens *)
         let addr = Net.Address.with_port addr port in
         _try_connect t addr;
-        RPC.reply (B.S "world")
+        RPCServer.reply (B.S "world")
       | _ ->
-        RPC.error"expected port");
+        RPCServer.error"expected port");
   (* keepalive *)
-  RPC.Server.register t.rpc "ping"
-    (fun _ _ -> RPC.reply (B.S "pong"));
+  RPCServer.register t.rpc "ping"
+    (fun _ _ -> RPCServer.reply (B.S "pong"));
   ()
 
 let create ?(cache_timeout=60.) rpc =
@@ -130,14 +132,14 @@ let broadcast t msg = _broadcast t msg
 
 let connect t addr =
   (* connect to addr *)
-  RPC.Proxy.connect addr >>= function
+  RPCClient.connect addr >>= function
   | None -> Lwt.return_false
   | Some proxy ->
-    let port = RPC.Server.port t.rpc in
+    let port = RPCServer.port t.rpc in
     (* send my port *)
     let msg = B.I port in
-    RPC.Proxy.call proxy "hello" msg >>= function
-    | RPC.Reply (B.S "world") ->
+    RPCClient.call proxy "hello" msg >>= function
+    | RPCClient.Reply (B.S "world") ->
       _add_neighbor t proxy;
       Lwt.return_true
     | _ -> Lwt.return_false
