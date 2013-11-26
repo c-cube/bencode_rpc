@@ -29,9 +29,9 @@ module Net = NetTcp
 
 type address = Net.Address.t 
 
-type result =
+type 'a result =
   | NoReply
-  | Reply of Bencode.t
+  | Reply of 'a
   | Error of string
 
 module B = Bencode
@@ -42,7 +42,7 @@ type t = {
   conn : Net.Connection.t;
   mutable count : int;  (* message id *)
   period : float;
-  callbacks : (int, (float * result Lwt.u)) Hashtbl.t;
+  callbacks : (int, (float * Bencode.t result Lwt.u)) Hashtbl.t;
 }
 
 let connection proxy = proxy.conn 
@@ -63,7 +63,8 @@ let close proxy =
 let _check_timeouts proxy =
   let to_remove = ref [] in
   let now = Unix.gettimeofday () in
-  (* find callbacks that have expired *)
+  (* find callbacks that have expired
+    FIXME write a more scalable algorithm... *)
   Hashtbl.iter
     (fun i (ttl, promise) ->
       if ttl < now
@@ -141,6 +142,34 @@ let call_ignore proxy name arg =
   let msg' = B.L [ B.S "ntfy"; B.S name; arg ] in
   Net.Connection.send proxy.conn msg';
   ()
+
+module Typed = struct
+  type ('a,'b) method_ = {
+    name : string;
+    encode : 'a -> Bencode.t;
+    decode : Bencode.t -> 'b option;
+  }
+
+  let create ~name ~encode ~decode =
+    {name; encode; decode; }
+
+  let call ?timeout rpc method_ param =
+    let b = method_.encode param in
+    let res = call ?timeout rpc method_.name b in
+    Lwt.map
+      (function
+      | NoReply -> NoReply
+      | Error s -> Error s
+      | Reply b ->
+        match method_.decode b with
+        | None -> Error ("could not decode result " ^ B.to_string b)
+        | Some result -> Reply result
+        )
+      res
+
+  let call_ignore rpc method_ param =
+    call_ignore rpc method_.name (method_.encode param)
+end
 
 let connect ?period addr =
   Net.Connection.try_open addr >>= function

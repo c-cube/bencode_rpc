@@ -31,12 +31,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 type address = NetTcp.Address.t
 
-type result =
+type 'a result =
   | NoReply
-  | Reply of Bencode.t
+  | Reply of 'a
   | Error of string
 
 type t
+
+(** {2 Basics} *)
 
 val connection : t -> NetTcp.Connection.t
   (** Underlying connection *)
@@ -50,7 +52,7 @@ val is_alive : t -> bool
 val close : t -> unit
   (** Close the connection and make the proxy unusable. *)
 
-val call : ?timeout:float -> t -> string -> Bencode.t -> result Lwt.t
+val call : ?timeout:float -> t -> string -> Bencode.t -> Bencode.t result Lwt.t
   (** Call a remote method, with given name and arguments, and get
       a future reply
       @param timeout number of seconds without answer before we
@@ -60,6 +62,29 @@ val call : ?timeout:float -> t -> string -> Bencode.t -> result Lwt.t
 val call_ignore : t -> string -> Bencode.t -> unit
   (** Call a remote method, without expecting result. Errors
       will not be reported. *)
+
+(** {2 Typed method invocation} *)
+
+module Typed : sig
+  type ('a,'b) method_
+    (** A remote method, with parameter type 'a and return type 'b, so
+        basically a RPC equivalent of 'a -> 'b. *)
+
+  val create : name:string ->
+              encode:('a -> Bencode.t) ->
+              decode:(Bencode.t -> 'b option) ->
+              ('a,'b) method_
+    (** Create a representation of a remote method, where parameters are
+        serialized with [encode] and result deserialized via [decode] *)
+
+  val call : ?timeout:float -> t -> ('a,'b) method_ -> 'a -> 'b result Lwt.t
+    (** Call a remote method, encoding and decoding parameters and result. *)
+
+  val call_ignore : t -> ('a,_) method_ -> 'a -> unit
+    (** Call a remote method, ignoring the result *)
+end
+
+(** {2 Creation of proxy} *)
 
 (** A proxy is parametrized by a [period]. This period, measured in seconds,
     is the amount of time between two successive checks of query
