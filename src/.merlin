@@ -1,4 +1,5 @@
 S .
 B ../_build/src/
+PKG bencode
 PKG lwt
 PKG lwt.unix

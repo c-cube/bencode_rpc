@@ -1,6 +1,6 @@
 OASISFormat: 0.3
 Name:        Bencode-RPC
-Version:     0.1
+Version:     0.2
 Homepage:    https://github.com/c-cube/bencode_rpc
 Authors:     Simon Cruanes
 License:     BSD3
@@ -17,9 +17,9 @@ Description:
 Library "bencode_rpc"
   Path:             src/
   Pack:             true
-  Modules:          Bencode, RPCServer, RPCClient, NetTcp,
+  Modules:          RPCServer, RPCClient, NetTcp,
                     Lwt_queue, Signal, Broadcast
-  BuildDepends:     lwt,lwt.unix
+  BuildDepends:     bencode,lwt,lwt.unix
 
 Document "bencode_rpc"
   Title:                documentation for Bencode-RPC
