@@ -13,19 +13,20 @@ the distribution.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
 ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+WARRANTIES OF MERCHANTAB.ListITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
 DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
 FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
 DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR B.StringINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIAB.ListITY, WHETHER IN CONTRACT, STRICT LIAB.ListITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIB.ListITY OF SUCH DAMAGE.
 *)
 
 (** {1 Network implementation using TCP sockets} *)
 
 module B = Bencode
+module BS = Bencode_streaming
 
 let (>>=) = Lwt.(>>=)
 
@@ -36,10 +37,10 @@ module Address = struct
   type addr = t
 
   let encode (addr, port) =
-    B.L [ B.S (Unix.string_of_inet_addr addr); B.I port ]
+    B.List [ B.String (Unix.string_of_inet_addr addr); B.Integer port ]
 
   let decode = function
-    | B.L [ B.S addr; B.I port ] ->
+    | B.List [ B.String addr; B.Integer port ] ->
       begin try
         let addr = Unix.inet_addr_of_string addr in
         addr, port
@@ -96,25 +97,25 @@ let call_in time f =
   Lwt.on_success fut f
 
 let rec _read_bencode ~socket ~decoder ~buf =
-  match B.parse_resume decoder with
-  | B.ParseOk b -> Lwt.return (Some b)
-  | B.ParseError e ->
+  match BS.parse_resume decoder with
+  | BS.ParseOk b -> Lwt.return (Some b)
+  | BS.ParseError e ->
     Lwt_unix.close socket >>= fun () ->
     Lwt.return_none
-  | B.ParsePartial ->
+  | BS.ParsePartial ->
     (* need to read more input *)
     Lwt_unix.read socket buf 0 (String.length buf) >>= fun n ->
     if n = 0
       then
         Lwt_unix.close socket >>= fun () ->
         Lwt.return_none
-      else match B.parse decoder buf 0 n with
-        | B.ParseError msg ->
+      else match BS.parse decoder buf 0 n with
+        | BS.ParseError msg ->
           Lwt_unix.close socket >>= fun () ->
           Lwt.return_none
-        | B.ParsePartial ->
+        | BS.ParsePartial ->
           _read_bencode ~socket ~decoder ~buf (* read more *)
-        | B.ParseOk msg ->
+        | BS.ParseOk msg ->
           Lwt.return (Some msg)
 
 (* write the given buffer (n bytes remaining). Calls [k]
@@ -147,7 +148,7 @@ module Connection = struct
     mutable alive : bool;
     on_close : unit Lwt_condition.t;
     events : B.t Signal.t;
-    decoder : B.decoder;
+    decoder : BS.decoder;
     sock : Lwt_unix.file_descr;
     queue : B.t option Lwt_queue.t; (* messages to send *)
   }
@@ -184,7 +185,7 @@ module Connection = struct
     Lwt_queue.pop conn.queue >>= function
     | None -> close conn
     | Some b ->
-      let s = B.to_string b in
+      let s = BS.to_string b in
       _write_full ~sock:conn.sock ~buf:s 0 (String.length s)
         (fun () -> _listen_queue conn)
 
@@ -195,7 +196,7 @@ module Connection = struct
       alive = true;
       on_close = Lwt_condition.create ();
       last_ping = Unix.gettimeofday();
-      decoder = B.mk_decoder ();
+      decoder = BS.mk_decoder ();
       events = Signal.create ();
       queue = Lwt_queue.create ();
     } in
@@ -287,7 +288,7 @@ module Server = struct
     (* forward received messages *)
     Signal.on (Connection.events conn)
       (fun msg ->
-        _log "received %s from client" (B.pretty_to_str msg);
+        _log "received %s from client" (BS.pretty_to_str msg);
         let ev = {rcv_conn=conn; rcv_msg=msg; rcv_addr=addr;} in
         Signal.send t.events (Receive ev);
         true);

@@ -14,14 +14,14 @@ the distribution.
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
 ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+WARRANTIES OF MERCHANTAB.ListITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
 DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
 FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
 DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR B.StringINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIAB.ListITY, WHETHER IN CONTRACT, STRICT LIAB.ListITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIB.ListITY OF SUCH DAMAGE.
 *)
 
 (** {1 Simple broadcast} *)
@@ -102,16 +102,16 @@ let _dispatch t =
   RPCServer.register t.rpc "hello"
     (fun addr msg ->
       match msg with
-      | B.I port ->
+      | B.Integer port ->
         (* protocol: send the port on which remote node listens *)
         let addr = Net.Address.with_port addr port in
         _try_connect t addr;
-        RPCServer.reply (B.S "world")
+        RPCServer.reply (B.String "world")
       | _ ->
         RPCServer.error"expected port");
   (* keepalive *)
   RPCServer.register t.rpc "ping"
-    (fun _ _ -> RPCServer.reply (B.S "pong"));
+    (fun _ _ -> RPCServer.reply (B.String "pong"));
   ()
 
 let create ?(cache_timeout=60.) rpc =
@@ -137,9 +137,9 @@ let connect t addr =
   | Some proxy ->
     let port = RPCServer.port t.rpc in
     (* send my port *)
-    let msg = B.I port in
+    let msg = B.Integer port in
     RPCClient.call proxy "hello" msg >>= function
-    | RPCClient.Reply (B.S "world") ->
+    | RPCClient.Reply (B.String "world") ->
       _add_neighbor t proxy;
       Lwt.return_true
     | _ -> Lwt.return_false

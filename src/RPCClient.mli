@@ -36,6 +36,14 @@ type 'a result =
   | Reply of 'a
   | Error of string
 
+module Result : sig
+  type +'a t = 'a result
+  val return : 'a -> 'a t
+  val fail : string -> _ t
+  val none : _ t
+  val (>>=) : 'a t -> ('a -> 'b t) -> 'b t
+end
+
 type t
 
 (** {2 Basics} *)
@@ -72,10 +80,12 @@ module Typed : sig
 
   val create : name:string ->
               encode:('a -> Bencode.t) ->
-              decode:(Bencode.t -> 'b option) ->
+              decode:(Bencode.t -> 'b) ->
               ('a,'b) method_
     (** Create a representation of a remote method, where parameters are
-        serialized with [encode] and result deserialized via [decode] *)
+        serialized with [encode] and result deserialized via [decode].
+        Any exception raised by [encode] or [decode] will be printed
+        into a string and result in an Error. *)
 
   val call : ?timeout:float -> t -> ('a,'b) method_ -> 'a -> 'b result Lwt.t
     (** Call a remote method, encoding and decoding parameters and result. *)

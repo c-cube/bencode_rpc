@@ -27,6 +27,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module Net = NetTcp
 
+module B = Bencode
+
 type address = Net.Address.t 
 
 type 'a result =
@@ -34,7 +36,16 @@ type 'a result =
   | Reply of 'a
   | Error of string
 
-module B = Bencode
+module Result = struct
+  type +'a t = 'a result
+  let return x = Reply x
+  let fail s = Error s
+  let none = NoReply
+  let (>>=) x f = match x with
+    | NoReply -> NoReply
+    | Error s -> Error s
+    | Reply x -> f x
+end
 
 let (>>=) = Lwt.(>>=)
 
@@ -91,7 +102,7 @@ let _handle_incoming proxy =
   Signal.on (Net.Connection.events proxy.conn)
     (fun msg ->
       begin match msg with
-      | B.L [ B.S "reply"; B.I i; arg ] ->
+      | B.List [ B.String "reply"; B.Integer i; arg ] ->
         begin try
           (* find which promise corresponds to this reply *)
           let _, promise = Hashtbl.find proxy.callbacks i in
@@ -100,7 +111,7 @@ let _handle_incoming proxy =
           Lwt.wakeup promise (Reply arg);
         with Not_found -> ()
         end
-      | B.L [ B.S "error" ; B.I i ; B.S errmsg ] ->
+      | B.List [ B.String "error" ; B.Integer i ; B.String errmsg ] ->
         begin try
           (* find which promise corresponds to this reply *)
           let _, promise = Hashtbl.find proxy.callbacks i in
@@ -133,13 +144,13 @@ let call ?(timeout=20.) proxy name arg =
   let ttl = Unix.gettimeofday() +. timeout in
   Hashtbl.add proxy.callbacks n (ttl, promise);
   (* send message wrapped in metadata *)
-  let msg' = B.L [ B.S "call"; B.I n; B.S name; arg] in
+  let msg' = B.List [ B.String "call"; B.Integer n; B.String name; arg] in
   Net.Connection.send proxy.conn msg';
   future
 
 let call_ignore proxy name arg =
   (* send message wrapped in metadata *)
-  let msg' = B.L [ B.S "ntfy"; B.S name; arg ] in
+  let msg' = B.List [ B.String "ntfy"; B.String name; arg ] in
   Net.Connection.send proxy.conn msg';
   ()
 
@@ -147,7 +158,7 @@ module Typed = struct
   type ('a,'b) method_ = {
     name : string;
     encode : 'a -> Bencode.t;
-    decode : Bencode.t -> 'b option;
+    decode : Bencode.t -> 'b;
   }
 
   let create ~name ~encode ~decode =
@@ -161,11 +172,12 @@ module Typed = struct
       | NoReply -> NoReply
       | Error s -> Error s
       | Reply b ->
-        match method_.decode b with
-        | None -> Error ("could not decode result " ^ B.to_string b)
-        | Some result -> Reply result
-        )
-      res
+        try
+          let result = method_.decode b in
+          Reply result
+        with e -> Error ( "could not decode result " ^
+                          Bencode_streaming.to_string b)
+      ) res
 
   let call_ignore rpc method_ param =
     call_ignore rpc method_.name (method_.encode param)

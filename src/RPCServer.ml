@@ -66,14 +66,14 @@ let _handle_incoming rpc =
     | Net.Server.Receive rcv_ev ->
       let addr = Net.Server.addr rcv_ev in
       begin match Net.Server.msg rcv_ev with
-      | B.L [ B.S "ntfy"; B.S name; arg ]  ->
+      | B.List [ B.String "ntfy"; B.String name; arg ]  ->
         (* notification *)
         begin try
           let method_ = Hashtbl.find rpc.methods name in
           Lwt.ignore_result (method_ addr arg)
         with Not_found -> ()
         end
-      | B.L [ B.S "call"; B.I i; B.S name; arg ] ->
+      | B.List [ B.String "call"; B.Integer i; B.String name; arg ] ->
         (* call expecting answer *)
         begin try
           let method_ = Hashtbl.find rpc.methods name in
@@ -83,17 +83,20 @@ let _handle_incoming rpc =
             (function 
               | NoReply -> ()
               | Reply arg' ->
-                let msg' = B.L [ B.S "reply" ; B.I i; arg' ] in
+                let msg' = B.List [ B.String "reply" ; B.Integer i; arg' ] in
                 Net.Server.reply rcv_ev msg';
               | Error errmsg ->
-                let msg' = B.L [ B.S "error" ; B.I i ; B.S errmsg ] in
+                let msg' = B.List [ B.String "error" ;
+                                    B.Integer i ; B.String errmsg ] in
                 Net.Server.reply rcv_ev msg')
             (fun exn ->
               let errmsg = Printexc.to_string exn in
-              let msg' = B.L [ B.S "error" ; B.I i ; B.S errmsg ] in
+              let msg' = B.List [ B.String "error" ;
+                                  B.Integer i ; B.String errmsg ] in
               Net.Server.reply rcv_ev msg')
         with Not_found ->
-          let msg' = B.L [ B.S "error" ; B.I i ; B.S "method not found" ] in
+          let msg' = B.List [ B.String "error" ; B.Integer i ;
+                              B.String "method not found" ] in
           Net.Server.reply rcv_ev msg'
         end
       | _ -> ()
