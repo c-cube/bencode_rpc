@@ -131,13 +131,14 @@ module Server : sig
     (** Signal transmitting events that occur on the server, when the
         server stops or a message is received *)
 
-  val create : ?retry:int -> ?port:int ->
-              unit -> t option
+  val create : ?retry:int -> ?port:int -> ?log:bool -> unit -> t option
     (** Create a new network node on the given port, if provided
         (a random port otherwise). May return None if it is impossible
         to create a socket on the given port.
         @param retry number of times a random port is tried if the previous
-          one is occypied (default 3) *)
+          one is occypied (default 3)
+        @param log: if true, then print events on stdout, if false or
+          unspecified does nothing *)
 
   val port : t -> int
     (** Port used by the network server *)

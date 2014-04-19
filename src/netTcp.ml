@@ -261,6 +261,7 @@ module Server = struct
     clients : Connection.t Address.Tbl.t;
     mutable listen_thread : unit Lwt.t option;
     mutable stop : bool;
+    mutable log : bool;
     on_stop : unit Lwt_condition.t;
   } (** Network layer that uses sockets *)
 
@@ -288,7 +289,7 @@ module Server = struct
     (* forward received messages *)
     Signal.on (Connection.events conn)
       (fun msg ->
-        _log "received %s from client" (BS.pretty_to_str msg);
+        if t.log then _log "received %s from client" (BS.pretty_to_str msg);
         let ev = {rcv_conn=conn; rcv_msg=msg; rcv_addr=addr;} in
         Signal.send t.events (Receive ev);
         true);
@@ -322,7 +323,7 @@ module Server = struct
     in
     accept ()
 
-  let rec create ?(retry=3) ?port () =
+  let rec create ?(retry=3) ?port ?(log=false) () =
     (* random port if none is specified *)
     let port' = match port with
       | Some p -> p
@@ -334,6 +335,7 @@ module Server = struct
       listen_thread = None;
       clients = Address.Tbl.create 15;
       stop = false;
+      log;
       on_stop = Lwt_condition.create ();
     } in
     try
