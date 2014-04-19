@@ -29,6 +29,10 @@ Document "bencode_rpc"
   XOCamlbuildPath:      .
   XOCamlbuildLibraries: bencode_rpc
 
+Test main
+  Type:     custom (0.2)
+  Command:  ./tests/all.sh
+
 SourceRepository head
   Type: git
   Location: https://github.com/c-cube/bencode_rpc
