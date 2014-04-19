@@ -1,0 +1,5 @@
+S src
+S tests
+B _build/src
+PKG lwt
+PKG bencode
