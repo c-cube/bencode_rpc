@@ -1,8 +1,8 @@
 # OASIS_START
-# DO NOT EDIT (digest: 05c3d3641da0c54f14e842e1a44fc72a)
+# DO NOT EDIT (digest: 337f09f1b8c7439709c1f4dcec9898d7)
 version = "0.2"
 description = "Remote Procedure Call in OCaml, with B-encode and Lwt"
-requires = "bencode lwt lwt.unix"
+requires = "bencode result bytes lwt lwt.unix"
 archive(byte) = "bencode_rpc.cma"
 archive(byte, plugin) = "bencode_rpc.cma"
 archive(native) = "bencode_rpc.cmxa"

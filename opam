@@ -19,6 +19,7 @@ depends: [
   "lwt"
   "base-unix"
   "base-bytes"
+  "result"
   "ocamlbuild" {build}
 ]
 dev-repo: "git://github.com/c-cube/bencode_rpc"

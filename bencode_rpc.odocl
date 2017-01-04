@@ -1,8 +1,9 @@
 # OASIS_START
-# DO NOT EDIT (digest: a1b79401c5ce716a1d8bb2c99d037d3f)
+# DO NOT EDIT (digest: dd64b1167d537534014f3d6aba9508ae)
 src/RPC_server
 src/RPC_client
 src/Net_tcp
+src/Encoding
 src/Lwt_queue
 src/Signal
 src/Broadcast
