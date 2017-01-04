@@ -20,7 +20,7 @@ Library "bencode_rpc"
   FindlibName:      bencode_rpc
   Modules:          RPC_server, RPC_client, Net_tcp,
                     Lwt_queue, Signal, Broadcast
-  BuildDepends:     bencode, lwt, lwt.unix
+  BuildDepends:     bencode, bytes, lwt, lwt.unix
 
 Document "bencode_rpc"
   Title:                documentation for Bencode-RPC

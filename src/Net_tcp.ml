@@ -83,7 +83,7 @@ let rec _read_bencode ~socket ~decoder ~buf =
       Lwt.return_none
     | BS.Decode.ParsePartial ->
       (* need to read more input *)
-      Lwt_unix.read socket buf 0 (String.length buf) >>= fun n ->
+      Lwt_unix.read socket buf 0 (Bytes.length buf) >>= fun n ->
       if n = 0 then (
         Lwt_unix.close socket >>= fun () ->
         Lwt.return_none
@@ -98,7 +98,7 @@ let rec _write_full ~sock ~buf i n k =
   if n = 0
   then k ()
   else
-    Lwt_unix.write sock buf i n >>= fun j ->
+    Lwt_unix.write_string sock buf i n >>= fun j ->
     _write_full ~sock ~buf (i+j) (n-j) k
 
 let _log format =
@@ -141,7 +141,7 @@ module Connection = struct
 
   (* read messages from the remote end *)
   let _listen_incoming conn =
-    let buf = String.make 256 ' ' in
+    let buf = Bytes.make 256 ' ' in
     let rec read () =
       if not conn.alive then Lwt.return_unit else
         _read_bencode ~socket:conn.sock ~decoder:conn.decoder ~buf >>=

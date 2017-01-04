@@ -41,9 +41,12 @@ configure:
 # OASIS_STOP
 
 push_doc: doc
-	scp -r bencode_rpc.docdir/* cedeela.fr:~/simon/root/software/bencode_rpc/
+	rsync -tavu bencode_rpc.docdir/* cedeela.fr:~/simon/root/software/bencode_rpc/
 
-tags:
-	find -name '*.mli?' | xargs otags 
+watch:
+	while find src/ -print0 | xargs -0 inotifywait -e delete_self -e modify ; do \
+		echo "============ at `date` ==========" ; \
+		make all; \
+	done
 
 .PHONY: push_doc tags

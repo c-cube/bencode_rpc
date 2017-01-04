@@ -1,5 +1,6 @@
 S src
 S tests
 B _build/src
-PKG lwt
-PKG bencode
+PKG lwt bencode bytes unix lwt.unix
+FLG -w +a-4-44
+FLG -safe-string

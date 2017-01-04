@@ -26,3 +26,6 @@ true: annot, bin_annot
 <src/*.ml{,i,y}>: package(lwt)
 <src/*.ml{,i,y}>: package(lwt.unix)
 # OASIS_STOP
+
+true: no_alias_deps, safe_string, short_paths, color(always)
+<src/**/*.ml*>: warn(+a-4-44)
