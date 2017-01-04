@@ -1,0 +1,27 @@
+opam-version: "1.2"
+name: "bencode-rpc"
+author: "Simon Cruanes"
+maintainer: "simon.cruanes.2007@m4x.org"
+homepage: "https://github.com/c-cube/bencode_rpc/"
+build: [
+  ["ocaml" "setup.ml" "-configure" "--prefix" prefix]
+  [make "build"]
+]
+install: [
+  [make "install"]
+]
+remove: [
+  ["ocamlfind" "remove" "bencode-rpc"]
+]
+depends: [
+  "ocamlfind"
+  "bencode" {>= "1.0.0"}
+  "lwt"
+  "base-unix"
+  "ocamlbuild" {build}
+]
+dev-repo: "git://github.com/c-cube/bencode_rpc"
+bug-reports: "https://github.com/c-cube/bencode_rpc/issues"
+available: [
+  ocaml-version >= "4.00.0"
+]
