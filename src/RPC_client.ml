@@ -7,7 +7,7 @@ module Net = Net_tcp
 
 module B = Bencode
 
-type address = Net.Address.t 
+type address = Net.Address.t
 
 type 'a result =
   | NoReply
@@ -34,7 +34,7 @@ type t = {
   callbacks : (int, (float * Bencode.t result Lwt.u)) Hashtbl.t;
 }
 
-let connection proxy = proxy.conn 
+let connection proxy = proxy.conn
 
 let address proxy = Net.Connection.address proxy.conn
 
@@ -153,8 +153,8 @@ module Typed = struct
           try
             let result = method_.decode b in
             Reply result
-          with e -> Error ( "could not decode result " ^
-                        Bencode_streaming.to_string b)
+          with e ->
+            Error ("could not decode result " ^ Bencode.encode_to_string b)
       ) res
 
   let call_ignore rpc method_ param =

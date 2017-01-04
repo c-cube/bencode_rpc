@@ -75,26 +75,22 @@ let call_in time f =
   Lwt.on_success fut f
 
 let rec _read_bencode ~socket ~decoder ~buf =
-  match BS.parse_resume decoder with
-    | BS.ParseOk b -> Lwt.return (Some b)
-    | BS.ParseError e ->
+  match BS.Decode.next decoder with
+    | BS.Decode.ParseOk b -> Lwt.return (Some b)
+    | BS.Decode.ParseEnd -> Lwt.return_none
+    | BS.Decode.ParseError e ->
       Lwt_unix.close socket >>= fun () ->
       Lwt.return_none
-    | BS.ParsePartial ->
+    | BS.Decode.ParsePartial ->
       (* need to read more input *)
       Lwt_unix.read socket buf 0 (String.length buf) >>= fun n ->
-      if n = 0
-      then
+      if n = 0 then (
         Lwt_unix.close socket >>= fun () ->
         Lwt.return_none
-      else match BS.parse decoder buf 0 n with
-        | BS.ParseError msg ->
-          Lwt_unix.close socket >>= fun () ->
-          Lwt.return_none
-        | BS.ParsePartial ->
-          _read_bencode ~socket ~decoder ~buf (* read more *)
-        | BS.ParseOk msg ->
-          Lwt.return (Some msg)
+      ) else (
+        BS.Decode.feed_bytes decoder buf 0 n;
+        _read_bencode ~socket ~decoder ~buf
+      )
 
 (* write the given buffer (n bytes remaining). Calls [k]
     when done *)
@@ -126,7 +122,7 @@ module Connection = struct
     mutable alive : bool;
     on_close : unit Lwt_condition.t;
     events : B.t Signal.t;
-    decoder : BS.decoder;
+    decoder : BS.Decode.t;
     sock : Lwt_unix.file_descr;
     queue : B.t option Lwt_queue.t; (* messages to send *)
   }
@@ -163,7 +159,7 @@ module Connection = struct
       Lwt_queue.pop conn.queue >>= function
       | None -> close conn
       | Some b ->
-        let s = BS.to_string b in
+        let s = Bencode.encode_to_string b in
         _write_full ~sock:conn.sock ~buf:s 0 (String.length s)
           (fun () -> _listen_queue conn)
 
@@ -174,7 +170,7 @@ module Connection = struct
       alive = true;
       on_close = Lwt_condition.create ();
       last_ping = Unix.gettimeofday();
-      decoder = BS.mk_decoder ();
+      decoder = BS.Decode.manual ();
       events = Signal.create ();
       queue = Lwt_queue.create ();
     } in
