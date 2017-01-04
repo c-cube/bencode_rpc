@@ -14,6 +14,16 @@ type 'a t = {
   decode: Bencode.t -> 'a or_error;
 }
 
+val encode : 'a t -> 'a -> Bencode.t
+val decode : 'a t -> Bencode.t -> 'a or_error
+
+exception Decode_fail of string * Bencode.t
+
+val decode_exn : 'a t -> Bencode.t -> 'a
+(** Unsafe version of {!decode}
+    @raise Decode_fail on decoding failure *)
+
+val unit : unit t
 val string : string t
 val int : int t
 val float : float t

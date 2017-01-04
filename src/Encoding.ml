@@ -52,6 +52,8 @@ let as_bool s =
 let bimap f1 f2 (e:_ t): _ t =
   mk_ (fun x -> e.encode (f1 x)) (fun s -> e.decode s >>= f2)
 
+let unit = mk_ (fun () -> B.Integer 0)
+    (function B.Integer 0 -> Ok () | b -> fail_expected "unit" b)
 let string = mk_ (fun s -> B.String s) as_string
 let int = mk_ (fun x -> B.Integer x) as_int
 let float = bimap string_of_float as_float string
@@ -103,5 +105,13 @@ let list e =
 
 let array e = bimap Array.to_list (fun l->Ok (Array.of_list l)) (list e)
 
+exception Decode_fail of string * Bencode.t
+
+let encode e x = e.encode x
+let decode e x = e.decode x
+
+let decode_exn e b = match decode e b with
+  | Ok x -> x
+  | Error msg -> raise (Decode_fail (msg, b))
 
 
