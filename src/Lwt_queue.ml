@@ -24,12 +24,12 @@ let push q x =
 
 let rec pop q =
   if Queue.is_empty q.queue
-    then
-      Lwt_condition.wait q.cond >>= fun () ->
-      let x = Queue.pop q.queue in
-      Lwt.return x
-    else
-      Lwt.return (Queue.pop q.queue)
+  then
+    Lwt_condition.wait q.cond >>= fun () ->
+    let x = Queue.pop q.queue in
+    Lwt.return x
+  else
+    Lwt.return (Queue.pop q.queue)
 
 let clear q =
   Queue.clear q.queue

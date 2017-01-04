@@ -53,53 +53,53 @@ let _check_timeouts proxy =
   let to_remove = ref [] in
   let now = Unix.gettimeofday () in
   (* find callbacks that have expired
-    FIXME write a more scalable algorithm... *)
+     FIXME write a more scalable algorithm... *)
   Hashtbl.iter
     (fun i (ttl, promise) ->
-      if ttl < now
-        then to_remove := (i, promise) :: !to_remove)
+       if ttl < now
+       then to_remove := (i, promise) :: !to_remove)
     proxy.callbacks;
   (* remove all such callbacks *)
   List.iter
     (fun (i, promise) ->
-      Hashtbl.remove proxy.callbacks i;
-      Lwt.wakeup promise (Error "timeout"))
+       Hashtbl.remove proxy.callbacks i;
+       Lwt.wakeup promise (Error "timeout"))
     !to_remove;
   ()
 
 (* wait some time, then check timeouts and loop *)
 let rec _poll proxy =
   if is_alive proxy
-    then Net.call_in proxy.period
+  then Net.call_in proxy.period
       (fun () ->
-        _check_timeouts proxy;
-        _poll proxy)
+         _check_timeouts proxy;
+         _poll proxy)
 
 (* handle received messages *)
 let _handle_incoming proxy =
   Signal.on (Net.Connection.events proxy.conn)
     (fun msg ->
-      begin match msg with
-      | B.List [ B.String "reply"; B.Integer i; arg ] ->
-        begin try
-          (* find which promise corresponds to this reply *)
-          let _, promise = Hashtbl.find proxy.callbacks i in
-          (*Util.debug "got reply for %d: %s" i (B.to_string (B.L args));*)
-          Hashtbl.remove proxy.callbacks i;
-          Lwt.wakeup promise (Reply arg);
-        with Not_found -> ()
-        end
-      | B.List [ B.String "error" ; B.Integer i ; B.String errmsg ] ->
-        begin try
-          (* find which promise corresponds to this reply *)
-          let _, promise = Hashtbl.find proxy.callbacks i in
-          Hashtbl.remove proxy.callbacks i;
-          Lwt.wakeup promise (Error errmsg);
-        with Not_found -> ()
-        end
-      | _ -> ()
-      end;
-      true)
+       begin match msg with
+         | B.List [ B.String "reply"; B.Integer i; arg ] ->
+           begin try
+               (* find which promise corresponds to this reply *)
+               let _, promise = Hashtbl.find proxy.callbacks i in
+               (*Util.debug "got reply for %d: %s" i (B.to_string (B.L args));*)
+               Hashtbl.remove proxy.callbacks i;
+               Lwt.wakeup promise (Reply arg);
+             with Not_found -> ()
+           end
+         | B.List [ B.String "error" ; B.Integer i ; B.String errmsg ] ->
+           begin try
+               (* find which promise corresponds to this reply *)
+               let _, promise = Hashtbl.find proxy.callbacks i in
+               Hashtbl.remove proxy.callbacks i;
+               Lwt.wakeup promise (Error errmsg);
+             with Not_found -> ()
+           end
+         | _ -> ()
+       end;
+       true)
 
 let of_conn ?(period=5.) conn =
   let proxy = {
@@ -147,14 +147,14 @@ module Typed = struct
     let res = call ?timeout rpc method_.name b in
     Lwt.map
       (function
-      | NoReply -> NoReply
-      | Error s -> Error s
-      | Reply b ->
-        try
-          let result = method_.decode b in
-          Reply result
-        with e -> Error ( "could not decode result " ^
-                          Bencode_streaming.to_string b)
+        | NoReply -> NoReply
+        | Error s -> Error s
+        | Reply b ->
+          try
+            let result = method_.decode b in
+            Reply result
+          with e -> Error ( "could not decode result " ^
+                        Bencode_streaming.to_string b)
       ) res
 
   let call_ignore rpc method_ param =

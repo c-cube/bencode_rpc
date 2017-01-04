@@ -11,33 +11,33 @@ type result =
   | Error of string
 
 type method_ = address -> Bencode.t -> result Lwt.t
-  (** A method can return a result, given an argument (a {!Bencode.t} value)
-      and the address from the caller *)
+(** A method can return a result, given an argument (a {!Bencode.t} value)
+    and the address from the caller *)
 
 type t
-  (** A RPC server, exposing a bunch of methods *)
+(** A RPC server, exposing a bunch of methods *)
 
 val port : t -> int
-  (** Port the system listens on *)
+(** Port the system listens on *)
 
 val wait : t -> unit Lwt.t
-  (** Wait for the server to stop *)
+(** Wait for the server to stop *)
 
 val of_server : Net_tcp.Server.t -> t
-  (** Create an instance of the RPC system, which can send and receive
-      remote function calls using the {!Net_tcp.Server.t} instance. *)
+(** Create an instance of the RPC system, which can send and receive
+    remote function calls using the {!Net_tcp.Server.t} instance. *)
 
 val create : ?port:int -> ?retry:int -> unit -> t option
-  (** Calls {!Net_tcp.Server.create} with the given optional arguments,
-      and then build a RPC server on top of it *)
+(** Calls {!Net_tcp.Server.create} with the given optional arguments,
+    and then build a RPC server on top of it *)
 
 val stop : t -> unit
-  (** Disable all threads and active processes *)
+(** Disable all threads and active processes *)
 
 val register : t -> string -> method_ -> unit
-  (** [register rpc name f] registers [f] under the given [name]. Calls
-      to [name] will be handled to [f].
-      @raise Failure when the name is already taken. *)
+(** [register rpc name f] registers [f] under the given [name]. Calls
+    to [name] will be handled to [f].
+    @raise Failure when the name is already taken. *)
 
 val fmt : Format.formatter -> t -> unit
 

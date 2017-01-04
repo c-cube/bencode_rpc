@@ -12,10 +12,10 @@ let (>>=) = Lwt.(>>=)
 type address = Net_tcp.Address.t
 
 module MsgHashtbl = Hashtbl.Make(struct
-  type t = B.t
-  let equal = B.eq
-  let hash = B.hash
-end)
+    type t = B.t
+    let equal = B.eq
+    let hash = B.hash
+  end)
 
 type event =
   | Receive of Bencode.t
@@ -47,11 +47,11 @@ let _try_connect t addr =
 let rec _cleanup t () =
   let now = Unix.gettimeofday () in
   let to_remove = MsgHashtbl.fold
-    (fun msg time acc ->
-      if time +. t.cache_timeout < now
-        then msg :: acc   (* too old, remove *)
-        else acc)
-    t.cache []
+      (fun msg time acc ->
+         if time +. t.cache_timeout < now
+         then msg :: acc   (* too old, remove *)
+         else acc)
+      t.cache []
   in
   List.iter (fun msg -> MsgHashtbl.remove t.cache msg) to_remove;
   (* do it again soon *)
@@ -68,25 +68,25 @@ let _dispatch t =
   (* broadcast message *)
   RPC_server.register t.rpc "broadcast"
     (fun _ msg ->
-      if not (MsgHashtbl.mem t.cache msg) then begin
-        MsgHashtbl.add t.cache msg (Unix.gettimeofday());
-        (* deliver message *)
-        Signal.send t.events (Receive msg);
-        (* re-broadcast *)
-        _broadcast t msg
-      end;
-      RPC_server.no_reply);
+       if not (MsgHashtbl.mem t.cache msg) then begin
+         MsgHashtbl.add t.cache msg (Unix.gettimeofday());
+         (* deliver message *)
+         Signal.send t.events (Receive msg);
+         (* re-broadcast *)
+         _broadcast t msg
+       end;
+       RPC_server.no_reply);
   (* new connection *)
   RPC_server.register t.rpc "hello"
     (fun addr msg ->
-      match msg with
-      | B.Integer port ->
-        (* protocol: send the port on which remote node listens *)
-        let addr = Net.Address.with_port addr port in
-        _try_connect t addr;
-        RPC_server.reply (B.String "world")
-      | _ ->
-        RPC_server.error"expected port");
+       match msg with
+         | B.Integer port ->
+           (* protocol: send the port on which remote node listens *)
+           let addr = Net.Address.with_port addr port in
+           _try_connect t addr;
+           RPC_server.reply (B.String "world")
+         | _ ->
+           RPC_server.error"expected port");
   (* keepalive *)
   RPC_server.register t.rpc "ping"
     (fun _ _ -> RPC_server.reply (B.String "pong"));

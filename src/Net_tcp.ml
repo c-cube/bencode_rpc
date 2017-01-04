@@ -10,7 +10,7 @@ let (>>=) = Lwt.(>>=)
 
 module Address = struct
   type t = Unix.inet_addr * int
-    (** Adresses are internet addresses, + port *)
+  (** Adresses are internet addresses, + port *)
 
   type addr = t
 
@@ -20,9 +20,9 @@ module Address = struct
   let decode = function
     | B.List [ B.String addr; B.Integer port ] ->
       begin try
-        let addr = Unix.inet_addr_of_string addr in
-        addr, port
-      with _ -> raise (Invalid_argument "bad address")
+          let addr = Unix.inet_addr_of_string addr in
+          addr, port
+        with _ -> raise (Invalid_argument "bad address")
       end
     | _ -> raise (Invalid_argument "bad address")
 
@@ -57,17 +57,17 @@ module Address = struct
   let by_name host port =
     Lwt_unix.gethostbyname host >>= fun host ->
     if Array.length host.Unix.h_addr_list = 0
-      then Lwt.return_none
-      else
-        let addr = host.Unix.h_addr_list.(0), port in
-        Lwt.return (Some addr)
+    then Lwt.return_none
+    else
+      let addr = host.Unix.h_addr_list.(0), port in
+      Lwt.return (Some addr)
 
   (** Hashtables on addresses *)
   module Tbl = Hashtbl.Make(struct
-    type t = addr
-    let equal = eq
-    let hash = hash
-  end)
+      type t = addr
+      let equal = eq
+      let hash = hash
+    end)
 end
 
 let call_in time f =
@@ -76,14 +76,14 @@ let call_in time f =
 
 let rec _read_bencode ~socket ~decoder ~buf =
   match BS.parse_resume decoder with
-  | BS.ParseOk b -> Lwt.return (Some b)
-  | BS.ParseError e ->
-    Lwt_unix.close socket >>= fun () ->
-    Lwt.return_none
-  | BS.ParsePartial ->
-    (* need to read more input *)
-    Lwt_unix.read socket buf 0 (String.length buf) >>= fun n ->
-    if n = 0
+    | BS.ParseOk b -> Lwt.return (Some b)
+    | BS.ParseError e ->
+      Lwt_unix.close socket >>= fun () ->
+      Lwt.return_none
+    | BS.ParsePartial ->
+      (* need to read more input *)
+      Lwt_unix.read socket buf 0 (String.length buf) >>= fun n ->
+      if n = 0
       then
         Lwt_unix.close socket >>= fun () ->
         Lwt.return_none
@@ -100,20 +100,20 @@ let rec _read_bencode ~socket ~decoder ~buf =
     when done *)
 let rec _write_full ~sock ~buf i n k =
   if n = 0
-    then k ()
-    else
-      Lwt_unix.write sock buf i n >>= fun j ->
-      _write_full ~sock ~buf (i+j) (n-j) k
+  then k ()
+  else
+    Lwt_unix.write sock buf i n >>= fun j ->
+    _write_full ~sock ~buf (i+j) (n-j) k
 
 let _log format =
   let b = Buffer.create 15 in
   Printf.kbprintf
     (fun b ->
-      Lwt.ignore_result (Lwt_io.printl (Buffer.contents b)))
+       Lwt.ignore_result (Lwt_io.printl (Buffer.contents b)))
     b format
 
 (* create a socket with the given address
-  TODO: option for ipv6 *)
+   TODO: option for ipv6 *)
 let mk_socket () =
   Lwt_unix.socket Lwt_unix.PF_INET Lwt_unix.SOCK_STREAM 0
 
@@ -148,24 +148,24 @@ module Connection = struct
     let buf = String.make 256 ' ' in
     let rec read () =
       if not conn.alive then Lwt.return_unit else
-      _read_bencode ~socket:conn.sock ~decoder:conn.decoder ~buf >>=
-      function
-      | None -> close conn
-      | Some b ->
-        Signal.send conn.events b;
-        read ()
+        _read_bencode ~socket:conn.sock ~decoder:conn.decoder ~buf >>=
+        function
+        | None -> close conn
+        | Some b ->
+          Signal.send conn.events b;
+          read ()
     in
     read()
 
   (* read messages to send to the remote end *)
   let rec _listen_queue conn =
     if not conn.alive then Lwt.return_unit else
-    Lwt_queue.pop conn.queue >>= function
-    | None -> close conn
-    | Some b ->
-      let s = BS.to_string b in
-      _write_full ~sock:conn.sock ~buf:s 0 (String.length s)
-        (fun () -> _listen_queue conn)
+      Lwt_queue.pop conn.queue >>= function
+      | None -> close conn
+      | Some b ->
+        let s = BS.to_string b in
+        _write_full ~sock:conn.sock ~buf:s 0 (String.length s)
+          (fun () -> _listen_queue conn)
 
   let _create addr sock =
     let conn = {
@@ -187,9 +187,9 @@ module Connection = struct
     let sock = mk_socket () in
     Lwt.catch
       (fun () ->
-        Lwt_unix.connect sock (Address.to_sockaddr addr) >>= fun () ->
-        let conn = _create addr sock in
-        Lwt.return (Some conn))
+         Lwt_unix.connect sock (Address.to_sockaddr addr) >>= fun () ->
+         let conn = _create addr sock in
+         Lwt.return (Some conn))
       (fun _ -> Lwt.return_none)
 
   let send conn msg =
@@ -255,8 +255,8 @@ module Server = struct
 
   let wait t =
     if t.stop
-      then Lwt.return_unit
-      else Lwt_condition.wait t.on_stop
+    then Lwt.return_unit
+    else Lwt_condition.wait t.on_stop
 
   (* handle given new client *)
   let _handle_client t socket addr =
@@ -267,14 +267,14 @@ module Server = struct
     (* forward received messages *)
     Signal.on (Connection.events conn)
       (fun msg ->
-        if t.log then _log "received %s from client" (BS.pretty_to_str msg);
-        let ev = {rcv_conn=conn; rcv_msg=msg; rcv_addr=addr;} in
-        Signal.send t.events (Receive ev);
-        true);
+         if t.log then _log "received %s from client" (BS.pretty_to_str msg);
+         let ev = {rcv_conn=conn; rcv_msg=msg; rcv_addr=addr;} in
+         Signal.send t.events (Receive ev);
+         true);
     (* upon closure of connection, react *)
     Lwt.on_success (Connection.wait conn)
       (fun () ->
-        Address.Tbl.remove t.clients (Connection.address conn));
+         Address.Tbl.remove t.clients (Connection.address conn));
     Lwt.return_unit
 
   (* main thread that listens to incoming connections *)
@@ -296,8 +296,8 @@ module Server = struct
         ]
       >>= fun () ->
       if not t.stop
-        then accept ()  (* accept next connection *)
-        else Lwt.return_unit
+      then accept ()  (* accept next connection *)
+      else Lwt.return_unit
     in
     accept ()
 
@@ -322,6 +322,6 @@ module Server = struct
     with Unix.Unix_error _ ->
       (* should we try another port? *)
       if retry > 0 && port = None
-        then create ~retry:(retry-1) ?port ()
-        else None
+      then create ~retry:(retry-1) ?port ()
+      else None
 end
