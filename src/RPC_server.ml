@@ -57,7 +57,7 @@ let _handle_incoming rpc =
                  (*Util.debug "method %s called with args %s" name (B.to_string (B.L args));*)
                  let fut = method_ addr arg in
                  Lwt.on_any fut
-                   (function 
+                   (function
                      | NoReply -> ()
                      | Reply arg' ->
                        let msg' = B.List [ B.String "reply" ; B.Integer i; arg' ] in

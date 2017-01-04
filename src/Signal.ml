@@ -11,7 +11,7 @@ type 'a t = {
 let nop_handler x = true
 
 let create () =
-  let s = { 
+  let s = {
     n = 0;
     handlers = Array.create 3 nop_handler;
   } in
