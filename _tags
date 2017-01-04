@@ -1,8 +1,9 @@
 # OASIS_START
-# DO NOT EDIT (digest: a8d9e4082cd0b200023e042afed0d24d)
+# DO NOT EDIT (digest: 10f2da5ac45750fe3af7aa391345f831)
 # Ignore VCS directories, you can use the same kind of rule outside
 # OASIS_START/STOP if you want to exclude directories that contains
 # useless stuff for the build process
+true: annot, bin_annot
 <**/.svn>: -traverse
 <**/.svn>: not_hygienic
 ".bzr": -traverse
@@ -15,13 +16,13 @@
 "_darcs": not_hygienic
 # Library bencode_rpc
 "src/bencode_rpc.cmxs": use_bencode_rpc
-"src/RPCServer.cmx": for-pack(Bencode_rpc)
-"src/RPCClient.cmx": for-pack(Bencode_rpc)
-"src/netTcp.cmx": for-pack(Bencode_rpc)
-"src/lwt_queue.cmx": for-pack(Bencode_rpc)
-"src/signal.cmx": for-pack(Bencode_rpc)
-"src/broadcast.cmx": for-pack(Bencode_rpc)
-<src/*.ml{,i}>: package(bencode)
-<src/*.ml{,i}>: package(lwt)
-<src/*.ml{,i}>: package(lwt.unix)
+"src/RPC_server.cmx": for-pack(Bencode_rpc)
+"src/RPC_client.cmx": for-pack(Bencode_rpc)
+"src/Net_tcp.cmx": for-pack(Bencode_rpc)
+"src/Lwt_queue.cmx": for-pack(Bencode_rpc)
+"src/Signal.cmx": for-pack(Bencode_rpc)
+"src/Broadcast.cmx": for-pack(Bencode_rpc)
+<src/*.ml{,i,y}>: package(bencode)
+<src/*.ml{,i,y}>: package(lwt)
+<src/*.ml{,i,y}>: package(lwt.unix)
 # OASIS_STOP

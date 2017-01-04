@@ -3,7 +3,7 @@
 
 (** {1 RPC server} *)
 
-type address = NetTcp.Address.t
+type address = Net_tcp.Address.t
 
 type result =
   | NoReply
@@ -23,7 +23,7 @@ val port : t -> int
 val wait : t -> unit Lwt.t
   (** Wait for the server to stop *)
 
-val of_server : NetTcp.Server.t -> t
+val of_server : Net_tcp.Server.t -> t
   (** Create an instance of the RPC system, which can send and receive
       remote function calls using the {!Net_tcp.Server.t} instance. *)
 

@@ -3,7 +3,7 @@
 
 (** {6 RPC} *)
 
-module Net = NetTcp
+module Net = Net_tcp
 
 module B = Bencode
 
@@ -182,4 +182,4 @@ let by_name ?period a i =
   | Some c -> Lwt.return (Some (of_conn ?period c))
 
 let fmt fmt rpc =
-  Format.fprintf fmt "<RPCClient on %a>" Net.Address.fmt (address rpc)
+  Format.fprintf fmt "<RPC_client on %a>" Net.Address.fmt (address rpc)

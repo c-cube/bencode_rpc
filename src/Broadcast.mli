@@ -10,7 +10,7 @@ neighbors, and keep a table of recently received messages to
 eliminate duplicates.
 *)
 
-type address = NetTcp.Address.t
+type address = Net_tcp.Address.t
 
 type t
   (** Broadcasting algorithm state. A value of this type keeps a list
@@ -22,7 +22,7 @@ type t
       in only one broadcast. If you need sending twice the same message,
       consider adding some nonce to it (timestamp, random value...) *)
 
-val create : ?cache_timeout:float -> RPCServer.t -> t
+val create : ?cache_timeout:float -> RPC_server.t -> t
   (** Create a new broadcasting device.
       @param cache_timeout the number of seconds before a received message
         is forgotten. Messages are kept in cache to prevent loops. *)

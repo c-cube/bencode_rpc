@@ -6,7 +6,7 @@
 (** This provides a lightweight RPC mechanism on top of a network
     implementation and B-encoded messages. *)
 
-type address = NetTcp.Address.t
+type address = Net_tcp.Address.t
 
 type 'a result =
   | NoReply
@@ -25,7 +25,7 @@ type t
 
 (** {2 Basics} *)
 
-val connection : t -> NetTcp.Connection.t
+val connection : t -> Net_tcp.Connection.t
   (** Underlying connection *)
 
 val address : t -> address
@@ -78,7 +78,7 @@ end
     expiration. Every [period] seconds, the system removes method calls
     that have timeouted, and close them (by sending {!Error}) *)
 
-val of_conn : ?period:float -> NetTcp.Connection.t -> t
+val of_conn : ?period:float -> Net_tcp.Connection.t -> t
   (** Create a proxy from an existing connection
       @return a proxy that acts as a "remote" object on which methods can be
         called, or None in case of failure *)
